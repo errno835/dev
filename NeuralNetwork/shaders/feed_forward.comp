@@ -1,0 +1,140 @@
+#version 450
+
+layout (local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+
+layout(constant_id = 0) const uint nSubjects = 1;
+layout(constant_id = 1) const uint nInputs = 28*28;
+layout(constant_id = 2) const uint nHidden = 28*28;
+layout(constant_id = 3) const uint nOutputs = 10;
+layout(constant_id = 4) const uint nSamples = 1;
+
+const uint inputToHiddenWeightsSize = nInputs * nHidden;
+const uint inputToHiddenBiasesSize = nHidden;
+
+const uint hiddenToOutputWeightsSize = nHidden * nOutputs;
+const uint hiddenToOutputBiasesSize = nOutputs;
+
+const uint subjectSize = 
+	inputToHiddenWeightsSize + inputToHiddenBiasesSize + 
+	hiddenToOutputWeightsSize + hiddenToOutputBiasesSize;
+
+const uint sampleSize = nInputs;
+
+layout(set = 0, binding = 0) buffer GLOBAL_IN_SUBJECT
+{
+   float data[nSubjects * subjectSize];
+} subject;
+
+layout(set = 0, binding = 1) buffer GLOBAL_IN_SAMPLES
+{
+   float data[nSamples * nInputs];
+} sample_input;
+
+layout(set = 0, binding = 2) buffer GLOBAL_OUT
+{
+   float data[nSubjects * nSamples * nOutputs];
+} classification_output;
+
+layout(constant_id = 5) const uint weightsSize = 28 * 28 * 28 * 28;
+layout(constant_id = 6) const uint biasesSize = 28 * 28;
+layout(constant_id = 7) const uint payloadSize = 28 * 28;
+layout(constant_id = 8) const uint resultSize = 28 * 28;
+
+float weights[weightsSize];
+float biases[biasesSize];
+float payload[payloadSize];
+float result[resultSize];
+
+void matrix_product_weights_payload(in uint a_nrows, in uint a_ncols, in uint b_nrows, in uint b_ncols);
+void matrix_add_biases(in uint a_nrows, in uint a_ncols);
+void matrix_sigmoid(in uint a_nrows, in uint a_ncols);
+
+void main()
+{
+	uint iSubject = gl_GlobalInvocationID.x;
+	
+	for (uint iSample = 0; iSample < nSamples; ++iSample)
+	{
+		// weights := input to hidden weights
+		for (uint i = 0; i < inputToHiddenWeightsSize; ++i)
+			weights[i] = subject.data[iSubject * subjectSize + i];
+		
+		// biases := input to hidden biases
+		for (uint i = 0; i < inputToHiddenBiasesSize; ++i)
+			biases[i] = subject.data[iSubject * subjectSize + inputToHiddenWeightsSize + i];
+		
+		// payload := sample data
+		for (uint i = 0; i < sampleSize; ++i)
+			payload[i] = sample_input.data[iSample * sampleSize + i];
+		
+		// result := sigmoid(weights * payload + biases)
+		matrix_product_weights_payload(nHidden, nInputs, nInputs, 1);
+		matrix_add_biases(nHidden, 1);
+		matrix_sigmoid(nHidden, 1);
+		
+		// weights := hidden to output weights
+		for (uint i = 0; i < hiddenToOutputWeightsSize; ++i)
+			weights[i] = subject.data[iSubject * subjectSize + inputToHiddenWeightsSize + inputToHiddenBiasesSize + i];
+		
+		// biases := hidden to output biases
+		for (uint i = 0; i < hiddenToOutputBiasesSize; ++i)
+			biases[i] = subject.data[iSubject * subjectSize + inputToHiddenWeightsSize + inputToHiddenBiasesSize + hiddenToOutputWeightsSize + i];
+		
+		// payload := result of previous layer
+		for (uint i = 0; i < inputToHiddenBiasesSize; ++i)
+			payload[i] = result[i];
+		
+		// result := sigmoid(weights * payload + biases)
+		matrix_product_weights_payload(nOutputs, nHidden, nHidden, 1);
+		matrix_add_biases(nOutputs, 1);
+		matrix_sigmoid(nOutputs, 1);
+		
+		// classification output := result of this layer
+		for (uint i = 0; i < nOutputs; ++i)
+			classification_output.data[iSubject * nSamples * nOutputs + iSample * nOutputs + i] = result[i];
+	}
+	
+	classification_output.data[iSubject] = subject.data[iSubject];
+}
+
+// result := weights * payload
+void matrix_product_weights_payload(in uint a_nrows, in uint a_ncols, in uint b_nrows, in uint b_ncols)
+{
+	for (uint ir = 0; ir < a_nrows; ++ir)
+	{
+		for (uint ic = 0; ic < b_ncols; ++ic)
+		{
+			float v = 0.0f;
+			for (uint i = 0; i < a_ncols; ++i)
+			{
+				v += weights[ir * a_ncols + i] * payload[i * b_ncols + ic];
+			}
+			result[ir * b_ncols + ic] = v;
+		}
+	}
+}
+
+// result += biases
+void matrix_add_biases(in uint a_nrows, in uint a_ncols)
+{
+	for (uint ir = 0; ir < a_nrows; ++ir)
+	{
+		for (uint ic = 0; ic < a_ncols; ++ic)
+		{
+			result[ir * a_ncols + ic] += biases[ir * a_ncols + ic];
+		}
+	}
+}
+
+// result = sigmoid(result)
+void matrix_sigmoid(in uint a_nrows, in uint a_ncols)
+{
+	for (uint ir = 0; ir < a_nrows; ++ir)
+	{
+		for (uint ic = 0; ic < a_ncols; ++ic)
+		{
+			float v = result[ir * a_ncols + ic];
+			result[ir * a_ncols + ic] = 1.0f / (1.0f + exp(-v));
+		}
+	}
+}
