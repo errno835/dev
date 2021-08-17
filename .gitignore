@@ -1,0 +1,8 @@
+MNIST/
+dep/
+depd/
+obj/
+objd/
+*.exe
+*.pdb
+.vs/
