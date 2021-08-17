@@ -12,7 +12,11 @@
 #include <set>
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cassert>
+
+#define NOMINMAX
+#include <Windows.h>
 
 uint32_t bigToLittleEndian(uint32_t v)
 {
@@ -126,79 +130,38 @@ bool readMNIST(const char *s, std::vector<nn::Population::Sample> &samples)
 	return true;
 }
 
-class HumanReadableSize
+std::string durationstring(const std::chrono::duration<double> &d)
 {
-public:
-	HumanReadableSize(double size)
+	int h = 0, m = 0;
+	double s = d.count();
+	
+	if (s >= 60.0)
 	{
-		_size = size;
-		buildString(_size);
+		m = s / 60.0;
+		s -= m * 60.0;
 	}
 	
-	HumanReadableSize(const char *str)
+	if (m >= 60)
 	{
-		strcpy(_str, str);
-		decodeString(_str);
+		h = m / 60;
+		m -= h * 60;
 	}
 	
-	HumanReadableSize(const std::string &str)
-	{
-		strcpy(_str, str.c_str());
-		decodeString(_str);
-	}
+	char temp[128];
+	char *p = temp;
 	
-	double size() const
-	{
-		return _size;
-	}
+	if (h > 0)
+		p += sprintf(p, "%dh ", h);
 	
-	const char *str() const
-	{
-		return _str;
-	}
+	if (m > 0 || h > 0)
+		p += sprintf(p, "%dm ", m);
 	
-private:
-	void buildString(double size)
-	{
-		static const char *_units[] = { "B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB", NULL };
-		
-		int i = 0;
-		while (size > 1024.0 && _units[i+1] != NULL)
-		{
-			size /= 1024.0;
-			++i;
-		}
-		
-		sprintf(_str, "%.2f %s", size, _units[i]);
-	}
+	sprintf(p, "%.2fs", s);
+	
+	return temp;
+}
 
-	void decodeString(const char *str)
-	{
-		static const char *_units = "BKMGTPEZY";
-		
-		char *endOfNumber;
-		_size = strtod(str, &endOfNumber);
-		
-		while (*endOfNumber != '\0' && isspace(*endOfNumber))
-			++endOfNumber;
-		
-		if (*endOfNumber != '\0')
-		{
-			const char *u = strchr(_units, *endOfNumber);
-			
-			if (u != NULL)
-			{
-				double f = pow(1024.0, (double)(u - _units));
-				_size *= f;
-			}
-		}
-	}
-	
-	double _size;
-	char _str[64];
-};
-
-int nSamples = 1000;
+int nSamples = 2;
 int nSubjects = 1;
 int nInputs = 28*28;
 int nHidden = 28*28;
@@ -287,19 +250,36 @@ int main(int argc, char *argv[])
 		for (size_t i = 0; i < samples.size(); ++i)
 			samples[i] = &trainingsamples[i];
 		
-		nn::Population population(nSubjects, nInputs, nHidden, nOutputs);
+		nn::Population population(
+			nSubjects, 
+			nInputs, {
+				{ nHidden, nn::ActivationFunction::SIGMOID }, 
+				{ nOutputs, nn::ActivationFunction::SOFTMAX }
+			});
 		
-		std::mt19937 g;
-		std::shuffle(samples.begin(), samples.end(), g);
+		for (int i = 0; i < 10; ++i)
+		{
+			printf("Generation %3d - ", i);
+			fflush(stdout);
+			
+			auto t0 = std::chrono::high_resolution_clock::now();
+			population.feedforward(samples);
+			auto t1 = std::chrono::high_resolution_clock::now();
+			
+			std::chrono::duration<double> elapsed_seconds = t1 - t0;
+			std::string d = durationstring(elapsed_seconds);
+			
+			nn::Population::Statistics s = population.computePopulationStatistics();
+			
+			printf("duration: %s, score: %5.1f%%, ", d.c_str(), 100.0 * s._score);
+			population.nextgeneration();
+			printf("\n");
+		}
 		
-		population.feedforward(samples);
+		return 0;
 		
-		nn::Population::Statistics s = population.computePopulationStatistics();
-		printf("Population statistics:\n");
-		printf("   min %f\n", s._min);
-		printf("   max %f\n", s._max);
-		printf("   avg %f\n", s._avg);
-		
+// #define VK_BACKEND
+#ifdef VK_BACKEND
 		uint32_t inputToHiddenWeightsSize = nInputs * nHidden;
 		uint32_t inputToHiddenBiasesSize = nHidden;
 		uint32_t hiddenToOutputWeightsSize = nHidden * nOutputs;
@@ -312,14 +292,14 @@ int main(int argc, char *argv[])
 		uint32_t singleSampleSize = nInputs;
 		uint32_t sampleSize = nSamples * singleSampleSize;
 		
-		printf("Input to hidden weights size:  %s\n", HumanReadableSize(inputToHiddenWeightsSize).str());
-		printf("Input to hidden biases size:   %s\n", HumanReadableSize(inputToHiddenBiasesSize).str());
-		printf("Hidden to output weights size: %s\n", HumanReadableSize(hiddenToOutputWeightsSize).str());
-		printf("Hidden to output biases size:  %s\n", HumanReadableSize(hiddenToOutputBiasesSize).str());
-		printf("Subject size:                  %s\n", HumanReadableSize(subjectSize).str());
-		printf("Population size:               %s\n", HumanReadableSize(populationSize).str());
-		printf("Single sample size:            %s\n", HumanReadableSize(singleSampleSize).str());
-		printf("Total sample size:             %s\n", HumanReadableSize(sampleSize).str());
+		printf("Input to hidden weights size:  %s\n", nn::HumanReadableSize(inputToHiddenWeightsSize).str());
+		printf("Input to hidden biases size:   %s\n", nn::HumanReadableSize(inputToHiddenBiasesSize).str());
+		printf("Hidden to output weights size: %s\n", nn::HumanReadableSize(hiddenToOutputWeightsSize).str());
+		printf("Hidden to output biases size:  %s\n", nn::HumanReadableSize(hiddenToOutputBiasesSize).str());
+		printf("Subject size:                  %s\n", nn::HumanReadableSize(subjectSize).str());
+		printf("Population size:               %s\n", nn::HumanReadableSize(populationSize).str());
+		printf("Single sample size:            %s\n", nn::HumanReadableSize(singleSampleSize).str());
+		printf("Total sample size:             %s\n", nn::HumanReadableSize(sampleSize).str());
 		
 		wvk::Device device;
 		device.setValidationEnabled(true);
@@ -401,9 +381,9 @@ int main(int argc, char *argv[])
 			{
 				wvk::Device::CommandBuffer *cb = device.getOrCreateComputeCommandBuffer("buffer-to-image");
 				device.beginRecordCommands(cb, 0);
-					device.setImageLayout(cb, populationImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+					// device.setImageLayout(cb, populationImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 					device.copy(cb, stagingbuffer, populationImage);
-					device.setImageLayout(cb, populationImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+					// device.setImageLayout(cb, populationImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 				device.endRecordCommands(cb);
 				device.submitComputeCommands(cb, bufferToImageFence);
 			}
@@ -420,9 +400,9 @@ int main(int argc, char *argv[])
 			{
 				wvk::Device::CommandBuffer *cb = device.getOrCreateComputeCommandBuffer("buffer-to-image");
 				device.beginRecordCommands(cb, 0);
-					device.setImageLayout(cb, sampleImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+					// device.setImageLayout(cb, sampleImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 					device.copy(cb, stagingbuffer, sampleImage);
-					device.setImageLayout(cb, sampleImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+					// device.setImageLayout(cb, sampleImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 				device.endRecordCommands(cb);
 				device.submitComputeCommands(cb, bufferToImageFence);
 			}
@@ -438,7 +418,7 @@ int main(int argc, char *argv[])
 		std::array<VkDescriptorSetLayoutBinding, 2> bindings = {};
 		
 		#ifdef DATA_BUFFER_BACKED
-			bindings[0].binding = 0;
+			bind ings[0].binding = 0;
 			bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 			bindings[0].descriptorCount = 1;
 			bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -772,6 +752,7 @@ int main(int argc, char *argv[])
 		bmanager->destroy(stagingbuffer);
 		
 		device.destroy();
+#endif // VK_BACKEND
 	}
 	catch (const std::exception &ex)
 	{
