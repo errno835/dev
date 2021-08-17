@@ -2,6 +2,7 @@
 #define __NN_POPULATION_H__
 
 #include "NeuralNetwork.h"
+#include <initializer_list>
 
 namespace nn
 {
@@ -9,7 +10,13 @@ namespace nn
 class Population
 {
 public:
-	Population(int n, int nInputs, int nHidden, int nOutputs);
+	Population(int n, int nInputs, std::initializer_list<NeuralNetwork::LayerInfo> layers)
+	{
+		_subjects.resize(n);
+		
+		for (int i = 0; i < n; ++i)
+			_subjects[i] = new Subject(nInputs, layers);
+	}
 	
 	using Sample = NeuralNetwork::Sample;
 	
@@ -18,7 +25,7 @@ public:
 		nn::NeuralNetwork _brain;
 		double _score;
 		
-		Subject(int nInputs, int nHidden, int nOutputs) : _brain(nInputs, nHidden, nOutputs), _score(0.0)
+		Subject(int nInputs, std::initializer_list<NeuralNetwork::LayerInfo> layers) : _brain(nInputs, layers), _score(0.0)
 		{
 		}
 	};
@@ -30,9 +37,7 @@ public:
 	
 	struct Statistics
 	{
-		double _min;
-		double _max;
-		double _avg;
+		double _score;
 	};
 	
 	Statistics computePopulationStatistics() const;
