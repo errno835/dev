@@ -25,7 +25,19 @@ void MatrixMemoryAllocator::reserve(uint32_t size)
 	_chunks.push_back(new Chunk());
 	Chunk *c = _chunks.back();
 	
-	c->_begin = new uint8_t[size];
+	try
+	{
+		c->_begin = new uint8_t[size];
+	}
+	catch (...)
+	{
+		printf("Allocation failed!   requested:%s, total: %s, waisted: %s\n", 
+			HumanReadableSize(size).str(), 
+			HumanReadableSize(getAllocatedSize()).str(), 
+			HumanReadableSize(getWaistedSize()).str());
+		throw;
+	}
+	
 	c->_end = c->_begin;
 	c->_storageEnd = c->_begin + size;
 }
@@ -51,6 +63,8 @@ uint8_t *MatrixMemoryAllocator::allocate(uint32_t size)
 {
 	if (size == 0)
 		return nullptr;
+	
+	// printf("MatrixMemoryAllocator::allocate %s\n", HumanReadableSize(size).str());
 	
 	for (std::list<Chunk *>::iterator it = _chunks.begin(); it != _chunks.end(); ++it)
 	{
@@ -78,6 +92,38 @@ uint8_t *MatrixMemoryAllocator::allocate(uint32_t size)
 
 void MatrixMemoryAllocator::release(uint8_t *v, uint32_t size)
 {
+}
+
+uint32_t MatrixMemoryAllocator::getAllocatedSize() const
+{
+	uint32_t s = 0;
+	
+	for (Chunk *c : _chunks)
+	{
+		s += c->totalSize();
+	}
+	for (Chunk *c : _fullChunks)
+	{
+		s += c->totalSize();
+	}
+	
+	return s;
+}
+
+uint32_t MatrixMemoryAllocator::getWaistedSize() const
+{
+	uint32_t s = 0;
+	
+	for (Chunk *c : _chunks)
+	{
+		s += c->availableSize();
+	}
+	for (Chunk *c : _fullChunks)
+	{
+		s += c->availableSize();
+	}
+	
+	return s;
 }
 
 }; // namespace nn
