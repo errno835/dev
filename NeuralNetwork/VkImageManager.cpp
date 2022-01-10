@@ -1,6 +1,8 @@
 #include "VkImageManager.h"
 
 #include <algorithm>
+#include <exception>
+#include <stdexcept>
 
 namespace wvk
 {

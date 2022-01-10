@@ -1,5 +1,8 @@
 #include "VkComputePipelineManager.h"
 
+#include <exception>
+#include <stdexcept>
+
 namespace wvk
 {
 

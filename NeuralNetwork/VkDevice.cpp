@@ -6,6 +6,8 @@
 
 #include <set>
 #include <algorithm>
+#include <exception>
+#include <stdexcept>
 
 namespace wvk
 {

@@ -10,22 +10,25 @@ namespace nn
 class Population
 {
 public:
-	Population(int n, int nInputs, std::initializer_list<NeuralNetwork::LayerInfo> layers)
+	using Sample = NeuralNetwork::Sample;
+	using LayerInfo = NeuralNetwork::LayerInfo;
+	
+	Population(int n, int nInputs, std::initializer_list<LayerInfo> layers, LossFunction lf)
 	{
 		_subjects.resize(n);
 		
-		for (int i = 0; i < n; ++i)
-			_subjects[i] = new Subject(nInputs, layers);
+		for (Subject *&subject : _subjects)
+		{
+			subject = new Subject(nInputs, layers, lf);
+		}
 	}
-	
-	using Sample = NeuralNetwork::Sample;
 	
 	struct Subject
 	{
 		nn::NeuralNetwork _brain;
 		double _score;
 		
-		Subject(int nInputs, std::initializer_list<NeuralNetwork::LayerInfo> layers) : _brain(nInputs, layers), _score(0.0)
+		Subject(int nInputs, std::initializer_list<LayerInfo> layers, LossFunction lf) : _brain(nInputs, layers, lf), _score(0.0)
 		{
 		}
 	};
@@ -33,7 +36,7 @@ public:
 	using SubjectList = std::vector<Subject *>;
 	const SubjectList &subjects() const { return _subjects; }
 	
-	void feedforward(const std::vector<const Sample *> &samples);
+	void feed_forward(const std::vector<const Sample *> &samples);
 	
 	struct Statistics
 	{

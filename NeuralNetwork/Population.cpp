@@ -28,7 +28,6 @@ namespace
 		{
 			_itask = itask;
 			_tasks = tasks;
-			_output.resize(nRows, nColumns);
 			_error.resize(nRows, nColumns);
 		}
 		
@@ -44,14 +43,13 @@ namespace
 				const Population::Sample *sample = task._sample;
 				Population::Subject *subject = task._subject;
 				
-				subject->_brain.feedforward(sample->_input, _output);
+				subject->_brain.feed_forward(sample->_input);
 				subject->_score += subject->_brain.compute_loss(sample->_target);
 			}
 		}
 		
 		std::atomic<int> *_itask;
 		std::vector<Task> *_tasks;
-		nn::Matrix _output;
 		nn::Matrix _error;
 		
 		std::thread _thread;
@@ -61,7 +59,7 @@ namespace
 	std::vector<TaskRunner> _task_runners;
 };
 
-void Population::feedforward(const std::vector<const Sample *> &samples)
+void Population::feed_forward(const std::vector<const Sample *> &samples)
 {
 	_tasks.resize(samples.size() * _subjects.size());
 	

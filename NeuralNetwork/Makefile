@@ -1,9 +1,5 @@
 CC = /c/LLVM/bin/clang
-# VULKAN_SDK = /c/VulkanSDK/1.0.46.0
-VULKAN_SDK = /c/VulkanSDK/1.2.135.0
-
-# CXXFLAGS = -c -g -gcodeview -Wno-deprecated
-# LINKSFLAGS = -g
+VULKAN_SDK = /c/VulkanSDK/1.2.198.1
 
 CXXFLAGS = -c -Wno-deprecated -I$(VULKAN_SDK)/Include
 CXX_DEBUG_FLAGS = $(CXXFLAGS) -g -gcodeview
@@ -27,7 +23,7 @@ dependencies = $(addprefix dep/,$(sources:.cpp=.d))
 dependenciesd = $(addprefix depd/,$(sources:.cpp=.d))
 shaders_spirv = $(shaders_src:.comp=.spirv)
 
-.PHONY: clean release debug all shaders
+all: release
 
 shaders/%.spirv: shaders/%.comp
 	$(VULKAN_SDK)/Bin/glslc $< -o $@
@@ -53,7 +49,6 @@ clean:
 
 release: nn.exe $(shaders_spirv)
 debug: nnd.exe $(shaders_spirv)
-all: release
 
 -include $(dependencies)
 -include $(dependenciesd)

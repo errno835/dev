@@ -73,10 +73,10 @@ nn::Matrix::value_type NeuralNetwork::compute_loss(const nn::Matrix &target)
 {
 	switch (_lf)
 	{
-		case MEAN_SQUARE_ERROR:
+		case LossFunction::MEAN_SQUARE_ERROR:
 			return compute_loss_mean_square_error(target);
 		
-		case SOFTMAX_CROSS_ENTROPY:
+		case LossFunction::SOFTMAX_CROSS_ENTROPY:
 			return compute_loss_softmax_cross_entropy(target);
 		
 		default:

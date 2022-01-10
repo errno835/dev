@@ -1,6 +1,8 @@
 #include "VkDeviceMemoryManager.h"
 
 #include <cassert>
+#include <exception>
+#include <stdexcept>
 
 namespace wvk
 {

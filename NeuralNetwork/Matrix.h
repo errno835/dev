@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cctype>
 #include <list>
+#include <string>
 #include <exception>
 
 // #define NN_MATRIX_RUNTIME_CHECKS

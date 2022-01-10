@@ -255,7 +255,9 @@ int main(int argc, char *argv[])
 			nInputs, {
 				{ nHidden, nn::ActivationFunction::SIGMOID }, 
 				{ nOutputs, nn::ActivationFunction::SOFTMAX }
-			});
+			}, 
+			nn::LossFunction::SOFTMAX_CROSS_ENTROPY
+		);
 		
 		for (int i = 0; i < 10; ++i)
 		{
@@ -263,7 +265,7 @@ int main(int argc, char *argv[])
 			fflush(stdout);
 			
 			auto t0 = std::chrono::high_resolution_clock::now();
-			population.feedforward(samples);
+			population.feed_forward(samples);
 			auto t1 = std::chrono::high_resolution_clock::now();
 			
 			std::chrono::duration<double> elapsed_seconds = t1 - t0;

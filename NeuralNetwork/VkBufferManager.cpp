@@ -1,6 +1,8 @@
 #include "VkBufferManager.h"
 
 #include <algorithm>
+#include <exception>
+#include <stdexcept>
 
 namespace wvk
 {
